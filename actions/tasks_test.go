@@ -78,6 +78,32 @@ func (as *ActionSuite) Test_TasksToggle_CompletesAndReopens() {
 	as.False(task.Completed)
 }
 
+func (as *ActionSuite) Test_TasksToggle_FormMethodOverride_Persists() {
+	task := &models.Task{Title: "Pendiente de completar"}
+	verrs, err := as.DB.ValidateAndCreate(task)
+	as.NoError(err)
+	as.False(verrs.HasAny())
+
+	res := as.HTML("/tasks/%s/toggle", task.ID).Post(url.Values{
+		"_method": {"PUT"}, "authenticity_token": {"test"},
+	})
+	as.Equal(303, res.Code)
+	as.Equal("/", res.Header().Get("Location"))
+
+	as.NoError(as.DB.Reload(task))
+	as.True(task.Completed)
+}
+
+func (as *ActionSuite) Test_TaskToggleScript_SendsPersistentRequest() {
+	res := as.HTML("/assets/app.js").Get()
+	as.Equal(200, res.Code)
+
+	body := res.Body.String()
+	as.NotContains(body, "fetch(form.action);")
+	as.Contains(body, `method: "POST"`)
+	as.Contains(body, "new FormData(form)")
+}
+
 func (as *ActionSuite) Test_TasksToggle_NotFound() {
 	id := uuid.Must(uuid.NewV4())
 	res := as.HTML("/tasks/%s/toggle", id).Put(url.Values{})
