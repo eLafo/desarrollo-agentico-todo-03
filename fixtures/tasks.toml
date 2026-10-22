@@ -24,3 +24,33 @@ name = "tres tareas"
       completed = true
       created_at = "<%= now() %>"
       updated_at = "<%= now() %>"
+
+[[scenario]]
+name = "tareas con fecha límite"
+
+  [[scenario.table]]
+    name = "tasks"
+
+    [[scenario.table.row]]
+      id = "<%= uuid() %>"
+      title = "Tarea vencida pendiente"
+      completed = false
+      due_date = "2000-01-01"
+      created_at = "<%= now() %>"
+      updated_at = "<%= now() %>"
+
+    [[scenario.table.row]]
+      id = "<%= uuid() %>"
+      title = "Tarea futura"
+      completed = false
+      due_date = "2099-12-31"
+      created_at = "<%= now() %>"
+      updated_at = "<%= now() %>"
+
+    [[scenario.table.row]]
+      id = "<%= uuid() %>"
+      title = "Tarea vencida completada"
+      completed = true
+      due_date = "2000-01-01"
+      created_at = "<%= now() %>"
+      updated_at = "<%= now() %>"
