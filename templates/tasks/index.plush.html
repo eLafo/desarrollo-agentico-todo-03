@@ -29,7 +29,12 @@
               <span class="toggle-label sr-only"><%= if (t.Completed) { %>Reabrir<% } else { %>Completar<% } %></span>
             </button>
           </form>
-          <span class="task-title"><%= t.Title %></span>
+          <div class="task-body">
+            <span class="task-title"><%= t.Title %></span>
+            <%= if (t.DueDate) { %>
+              <span class="task-due">Fecha límite: <time datetime="<%= t.DueDateValue() %>"><%= t.DueDateLabel() %></time></span>
+            <% } %>
+          </div>
           <%= if (t.Completed) { %>
             <span class="task-status">Completada</span>
           <% } %>
@@ -68,13 +73,28 @@
       placeholder="Añadir una tarea…"
       maxlength="200"
       autocomplete="off"
-      <%= if (errors.HasAny()) { %>autofocus aria-invalid="true" aria-describedby="title-error"<% } %>
+      <%= if (len(errors.Get("title")) > 0) { %>autofocus aria-invalid="true" aria-describedby="title-error"<% } %>
     >
     <button type="submit" class="button button-primary">Añadir</button>
   </div>
-  <%= if (errors.HasAny()) { %>
+  <div class="new-task-due">
+    <label for="task-due-date">Fecha límite <span class="field-optional">(opcional)</span></label>
+    <input
+      id="task-due-date"
+      type="date"
+      name="due_date"
+      value="<%= task.DueDateValue() %>"
+      <%= if (len(errors.Get("due_date")) > 0) { %>aria-invalid="true" aria-describedby="due-date-error"<% } %>
+    >
+  </div>
+  <%= if (len(errors.Get("title")) > 0) { %>
     <p id="title-error" class="field-error" role="alert">
       <%= for (msg) in errors.Get("title") { %><%= msg %><% } %>
+    </p>
+  <% } %>
+  <%= if (len(errors.Get("due_date")) > 0) { %>
+    <p id="due-date-error" class="field-error" role="alert">
+      <%= for (msg) in errors.Get("due_date") { %><%= msg %><% } %>
     </p>
   <% } %>
 </form>
