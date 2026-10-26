@@ -129,12 +129,22 @@ h1 {
   border-bottom: 1px solid var(--color-border);
 }
 
-.task-title {
+.task-body {
   align-self: center;
   min-width: 0;
   padding: 0.65rem 0;
+}
+
+.task-title {
+  display: block;
   overflow-wrap: anywhere;
   line-height: 1.55;
+}
+
+.task-due {
+  display: block;
+  color: var(--color-muted);
+  font-size: 0.8rem;
 }
 
 .task-toggle-button,
@@ -245,7 +255,8 @@ h1 {
   line-height: 1;
 }
 
-input[type="text"] {
+input[type="text"],
+input[type="date"] {
   width: 100%;
   min-width: 0;
   min-height: 44px;
@@ -257,8 +268,26 @@ input[type="text"] {
   border-radius: 6px;
 }
 
+input[type="date"] {
+  width: auto;
+}
+
 .new-task-row input {
   flex: 1;
+}
+
+.new-task-due {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+  padding-left: calc(44px + 0.6rem);
+}
+
+.new-task-due label {
+  color: var(--color-muted);
+  font-size: 0.85rem;
 }
 
 input::placeholder {
@@ -369,6 +398,10 @@ input:focus-visible {
   font-weight: 600;
 }
 
+.edit-task-due {
+  margin-top: 1.25rem;
+}
+
 .edit-task-actions {
   display: flex;
   flex-wrap: wrap;
@@ -448,6 +481,11 @@ input:focus-visible {
 
   .new-task-row {
     gap: 0.4rem;
+  }
+
+  .new-task-due {
+    gap: 0.4rem;
+    padding-left: calc(32px + 0.4rem);
   }
 
   .add-mark {
