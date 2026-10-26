@@ -129,12 +129,22 @@ h1 {
   border-bottom: 1px solid var(--color-border);
 }
 
-.task-title {
+.task-body {
+  display: flex;
+  flex-direction: column;
   align-self: center;
   min-width: 0;
   padding: 0.65rem 0;
+}
+
+.task-title {
   overflow-wrap: anywhere;
   line-height: 1.55;
+}
+
+.task-due {
+  color: var(--color-muted);
+  font-size: 0.8rem;
 }
 
 .task-toggle-button,
@@ -245,7 +255,8 @@ h1 {
   line-height: 1;
 }
 
-input[type="text"] {
+input[type="text"],
+input[type="date"] {
   width: 100%;
   min-width: 0;
   min-height: 44px;
@@ -259,6 +270,11 @@ input[type="text"] {
 
 .new-task-row input {
   flex: 1;
+}
+
+.new-task-row input[type="date"] {
+  flex: 0 0 auto;
+  width: auto;
 }
 
 input::placeholder {
@@ -369,6 +385,15 @@ input:focus-visible {
   font-weight: 600;
 }
 
+.form-field + .form-field {
+  margin-top: 1.25rem;
+}
+
+.field-optional {
+  color: var(--color-muted);
+  font-weight: 400;
+}
+
 .edit-task-actions {
   display: flex;
   flex-wrap: wrap;
@@ -447,11 +472,21 @@ input:focus-visible {
   }
 
   .new-task-row {
+    flex-wrap: wrap;
     gap: 0.4rem;
   }
 
   .add-mark {
     width: 36px;
+  }
+
+  .new-task-row input[type="text"] {
+    flex-basis: calc(100% - 3rem);
+  }
+
+  .new-task-row input[type="date"] {
+    flex: 1 1 auto;
+    margin-left: calc(32px + 0.4rem);
   }
 }
 
