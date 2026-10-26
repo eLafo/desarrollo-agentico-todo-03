@@ -11,6 +11,36 @@ import (
 	"github.com/gobuffalo/validate/v3"
 )
 
+// taskForm recoge los campos editables de una tarea desde los formularios.
+type taskForm struct {
+	Title   string `form:"title" json:"title"`
+	DueDate string `form:"due_date" json:"due_date"`
+}
+
+// applyTaskForm copia en la tarea los campos del formulario y la valida.
+// Una fecha límite con formato no válido no se aplica y se informa como error de "due_date".
+func applyTaskForm(c buffalo.Context, tx *pop.Connection, task *models.Task) (*validate.Errors, error) {
+	form := taskForm{}
+	if err := c.Bind(&form); err != nil {
+		return nil, err
+	}
+	task.Title = strings.TrimSpace(form.Title)
+
+	dueDate, dueDateErr := models.ParseDueDate(form.DueDate)
+	if dueDateErr == nil {
+		task.DueDate = dueDate
+	}
+
+	verrs, err := task.Validate(tx)
+	if err != nil {
+		return nil, err
+	}
+	if dueDateErr != nil {
+		verrs.Add("due_date", "La fecha límite no es válida.")
+	}
+	return verrs, nil
+}
+
 // TasksIndex muestra la lista de tareas y el formulario de creación.
 func TasksIndex(c buffalo.Context) error {
 	tx := c.Value("tx").(*pop.Connection)
@@ -31,12 +61,7 @@ func TasksCreate(c buffalo.Context) error {
 	tx := c.Value("tx").(*pop.Connection)
 
 	task := &models.Task{}
-	if err := c.Bind(task); err != nil {
-		return err
-	}
-	task.Title = strings.TrimSpace(task.Title)
-
-	verrs, err := tx.ValidateAndCreate(task)
+	verrs, err := applyTaskForm(c, tx, task)
 	if err != nil {
 		return err
 	}
@@ -51,6 +76,10 @@ func TasksCreate(c buffalo.Context) error {
 		c.Set("task", task)
 		c.Set("errors", verrs)
 		return c.Render(http.StatusUnprocessableEntity, r.HTML("tasks/index.plush.html"))
+	}
+
+	if err := tx.Create(task); err != nil {
+		return err
 	}
 
 	c.Flash().Add("success", "Tarea creada.")
@@ -71,7 +100,7 @@ func TasksEdit(c buffalo.Context) error {
 	return c.Render(http.StatusOK, r.HTML("tasks/edit.plush.html"))
 }
 
-// TasksUpdate actualiza solo el título, conservando los demás datos de la tarea.
+// TasksUpdate actualiza el título y la fecha límite, conservando los demás datos de la tarea.
 func TasksUpdate(c buffalo.Context) error {
 	tx := c.Value("tx").(*pop.Connection)
 
@@ -80,15 +109,7 @@ func TasksUpdate(c buffalo.Context) error {
 		return c.Error(http.StatusNotFound, err)
 	}
 
-	input := struct {
-		Title string `form:"title" json:"title"`
-	}{}
-	if err := c.Bind(&input); err != nil {
-		return err
-	}
-	task.Title = strings.TrimSpace(input.Title)
-
-	verrs, err := tx.ValidateAndUpdate(task)
+	verrs, err := applyTaskForm(c, tx, task)
 	if err != nil {
 		return err
 	}
@@ -96,6 +117,10 @@ func TasksUpdate(c buffalo.Context) error {
 		c.Set("task", task)
 		c.Set("errors", verrs)
 		return c.Render(http.StatusUnprocessableEntity, r.HTML("tasks/edit.plush.html"))
+	}
+
+	if err := tx.Update(task); err != nil {
+		return err
 	}
 
 	c.Flash().Add("success", "Tarea actualizada.")
