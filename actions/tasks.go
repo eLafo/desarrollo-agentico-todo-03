@@ -11,6 +11,12 @@ import (
 	"github.com/gobuffalo/validate/v3"
 )
 
+// taskInput recoge los campos que el usuario puede escribir en una tarea.
+type taskInput struct {
+	Title   string `form:"title" json:"title"`
+	DueDate string `form:"due_date" json:"due_date"`
+}
+
 // TasksIndex muestra la lista de tareas y el formulario de creación.
 func TasksIndex(c buffalo.Context) error {
 	tx := c.Value("tx").(*pop.Connection)
@@ -30,11 +36,12 @@ func TasksIndex(c buffalo.Context) error {
 func TasksCreate(c buffalo.Context) error {
 	tx := c.Value("tx").(*pop.Connection)
 
-	task := &models.Task{}
-	if err := c.Bind(task); err != nil {
+	input := taskInput{}
+	if err := c.Bind(&input); err != nil {
 		return err
 	}
-	task.Title = strings.TrimSpace(task.Title)
+	task := &models.Task{Title: strings.TrimSpace(input.Title)}
+	task.SetDueDate(input.DueDate)
 
 	verrs, err := tx.ValidateAndCreate(task)
 	if err != nil {
@@ -71,7 +78,7 @@ func TasksEdit(c buffalo.Context) error {
 	return c.Render(http.StatusOK, r.HTML("tasks/edit.plush.html"))
 }
 
-// TasksUpdate actualiza solo el título, conservando los demás datos de la tarea.
+// TasksUpdate actualiza el título y la fecha límite, conservando los demás datos de la tarea.
 func TasksUpdate(c buffalo.Context) error {
 	tx := c.Value("tx").(*pop.Connection)
 
@@ -80,13 +87,12 @@ func TasksUpdate(c buffalo.Context) error {
 		return c.Error(http.StatusNotFound, err)
 	}
 
-	input := struct {
-		Title string `form:"title" json:"title"`
-	}{}
+	input := taskInput{}
 	if err := c.Bind(&input); err != nil {
 		return err
 	}
 	task.Title = strings.TrimSpace(input.Title)
+	task.SetDueDate(input.DueDate)
 
 	verrs, err := tx.ValidateAndUpdate(task)
 	if err != nil {
