@@ -1,6 +1,9 @@
 package models
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 func (ms *ModelSuite) Test_Task_Create_Valid() {
 	task := &Task{Title: "Comprar café"}
@@ -68,4 +71,54 @@ func (ms *ModelSuite) Test_Task_Toggle_Persists() {
 	reloaded := &Task{}
 	ms.NoError(ms.DB.Find(reloaded, task.ID))
 	ms.True(reloaded.Completed)
+}
+
+func (ms *ModelSuite) Test_ParseDueDate_Empty() {
+	for _, value := range []string{"", "   "} {
+		dueDate, err := ParseDueDate(value)
+		ms.NoError(err)
+		ms.Nil(dueDate)
+	}
+}
+
+func (ms *ModelSuite) Test_ParseDueDate_Valid() {
+	dueDate, err := ParseDueDate("2026-11-15")
+	ms.NoError(err)
+	ms.NotNil(dueDate)
+	ms.Equal("2026-11-15", dueDate.Format(DueDateLayout))
+}
+
+func (ms *ModelSuite) Test_ParseDueDate_Invalid() {
+	for _, value := range []string{"15/11/2026", "2026-02-30", "2026-11-15T10:00", "0000-01-01", "mañana"} {
+		dueDate, err := ParseDueDate(value)
+		ms.Error(err, value)
+		ms.Nil(dueDate, value)
+	}
+}
+
+func (ms *ModelSuite) Test_Task_DueDate_Persists() {
+	dueDate := time.Date(2026, time.November, 15, 0, 0, 0, 0, time.UTC)
+	task := &Task{Title: "Pagar el seguro", DueDate: &dueDate}
+	verrs, err := ms.DB.ValidateAndCreate(task)
+	ms.NoError(err)
+	ms.False(verrs.HasAny())
+
+	reloaded := &Task{}
+	ms.NoError(ms.DB.Find(reloaded, task.ID))
+	ms.NotNil(reloaded.DueDate)
+	ms.Equal("2026-11-15", reloaded.DueDateValue())
+	ms.Equal("15/11/2026", reloaded.DueDateLabel())
+}
+
+func (ms *ModelSuite) Test_Task_DueDate_Optional() {
+	task := &Task{Title: "Sin prisa"}
+	verrs, err := ms.DB.ValidateAndCreate(task)
+	ms.NoError(err)
+	ms.False(verrs.HasAny())
+
+	reloaded := &Task{}
+	ms.NoError(ms.DB.Find(reloaded, task.ID))
+	ms.Nil(reloaded.DueDate)
+	ms.Equal("", reloaded.DueDateValue())
+	ms.Equal("", reloaded.DueDateLabel())
 }

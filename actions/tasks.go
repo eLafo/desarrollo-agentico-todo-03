@@ -35,8 +35,10 @@ func TasksCreate(c buffalo.Context) error {
 		return err
 	}
 	task.Title = strings.TrimSpace(task.Title)
+	dueDate, dueDateErr := models.ParseDueDate(c.Param("due_date"))
+	task.DueDate = dueDate
 
-	verrs, err := tx.ValidateAndCreate(task)
+	verrs, err := validateTask(tx, task, dueDateErr)
 	if err != nil {
 		return err
 	}
@@ -51,6 +53,10 @@ func TasksCreate(c buffalo.Context) error {
 		c.Set("task", task)
 		c.Set("errors", verrs)
 		return c.Render(http.StatusUnprocessableEntity, r.HTML("tasks/index.plush.html"))
+	}
+
+	if err := tx.Create(task); err != nil {
+		return err
 	}
 
 	c.Flash().Add("success", "Tarea creada.")
@@ -71,7 +77,7 @@ func TasksEdit(c buffalo.Context) error {
 	return c.Render(http.StatusOK, r.HTML("tasks/edit.plush.html"))
 }
 
-// TasksUpdate actualiza solo el título, conservando los demás datos de la tarea.
+// TasksUpdate actualiza el título y la fecha límite, conservando los demás datos de la tarea.
 func TasksUpdate(c buffalo.Context) error {
 	tx := c.Value("tx").(*pop.Connection)
 
@@ -81,14 +87,19 @@ func TasksUpdate(c buffalo.Context) error {
 	}
 
 	input := struct {
-		Title string `form:"title" json:"title"`
+		Title   string `form:"title" json:"title"`
+		DueDate string `form:"due_date" json:"due_date"`
 	}{}
 	if err := c.Bind(&input); err != nil {
 		return err
 	}
 	task.Title = strings.TrimSpace(input.Title)
+	dueDate, dueDateErr := models.ParseDueDate(input.DueDate)
+	if dueDateErr == nil {
+		task.DueDate = dueDate
+	}
 
-	verrs, err := tx.ValidateAndUpdate(task)
+	verrs, err := validateTask(tx, task, dueDateErr)
 	if err != nil {
 		return err
 	}
@@ -96,6 +107,10 @@ func TasksUpdate(c buffalo.Context) error {
 		c.Set("task", task)
 		c.Set("errors", verrs)
 		return c.Render(http.StatusUnprocessableEntity, r.HTML("tasks/edit.plush.html"))
+	}
+
+	if err := tx.Update(task); err != nil {
+		return err
 	}
 
 	c.Flash().Add("success", "Tarea actualizada.")
@@ -134,4 +149,16 @@ func TasksDestroy(c buffalo.Context) error {
 
 	c.Flash().Add("success", "Tarea eliminada.")
 	return c.Redirect(http.StatusSeeOther, "/")
+}
+
+// validateTask valida la tarea y añade un error si la fecha límite recibida no es válida.
+func validateTask(tx *pop.Connection, task *models.Task, dueDateErr error) (*validate.Errors, error) {
+	verrs, err := task.Validate(tx)
+	if err != nil {
+		return nil, err
+	}
+	if dueDateErr != nil {
+		verrs.Add("due_date", "La fecha límite no es válida.")
+	}
+	return verrs, nil
 }
