@@ -11,6 +11,27 @@ import (
 	"github.com/gobuffalo/validate/v3"
 )
 
+// taskInput recoge los campos de una tarea que se pueden enviar desde los formularios.
+type taskInput struct {
+	Title   string `form:"title" json:"title"`
+	DueDate string `form:"due_date" json:"due_date"`
+}
+
+// apply copia en la tarea el título y la fecha límite recibidos. Si la fecha
+// límite no es un día válido, conserva la de la tarea y devuelve el error.
+func (in taskInput) apply(task *models.Task) *validate.Errors {
+	verrs := validate.NewErrors()
+	task.Title = strings.TrimSpace(in.Title)
+
+	dueDate, err := models.ParseDueDate(in.DueDate)
+	if err != nil {
+		verrs.Add("due_date", "La fecha límite no es válida.")
+		return verrs
+	}
+	task.DueDate = dueDate
+	return verrs
+}
+
 // TasksIndex muestra la lista de tareas y el formulario de creación.
 func TasksIndex(c buffalo.Context) error {
 	tx := c.Value("tx").(*pop.Connection)
@@ -30,15 +51,19 @@ func TasksIndex(c buffalo.Context) error {
 func TasksCreate(c buffalo.Context) error {
 	tx := c.Value("tx").(*pop.Connection)
 
-	task := &models.Task{}
-	if err := c.Bind(task); err != nil {
+	input := taskInput{}
+	if err := c.Bind(&input); err != nil {
 		return err
 	}
-	task.Title = strings.TrimSpace(task.Title)
 
-	verrs, err := tx.ValidateAndCreate(task)
-	if err != nil {
-		return err
+	task := &models.Task{}
+	verrs := input.apply(task)
+	if !verrs.HasAny() {
+		var err error
+		verrs, err = tx.ValidateAndCreate(task)
+		if err != nil {
+			return err
+		}
 	}
 
 	if verrs.HasAny() {
@@ -71,7 +96,7 @@ func TasksEdit(c buffalo.Context) error {
 	return c.Render(http.StatusOK, r.HTML("tasks/edit.plush.html"))
 }
 
-// TasksUpdate actualiza solo el título, conservando los demás datos de la tarea.
+// TasksUpdate actualiza el título y la fecha límite, conservando los demás datos de la tarea.
 func TasksUpdate(c buffalo.Context) error {
 	tx := c.Value("tx").(*pop.Connection)
 
@@ -80,17 +105,18 @@ func TasksUpdate(c buffalo.Context) error {
 		return c.Error(http.StatusNotFound, err)
 	}
 
-	input := struct {
-		Title string `form:"title" json:"title"`
-	}{}
+	input := taskInput{}
 	if err := c.Bind(&input); err != nil {
 		return err
 	}
-	task.Title = strings.TrimSpace(input.Title)
 
-	verrs, err := tx.ValidateAndUpdate(task)
-	if err != nil {
-		return err
+	verrs := input.apply(task)
+	if !verrs.HasAny() {
+		var err error
+		verrs, err = tx.ValidateAndUpdate(task)
+		if err != nil {
+			return err
+		}
 	}
 	if verrs.HasAny() {
 		c.Set("task", task)
