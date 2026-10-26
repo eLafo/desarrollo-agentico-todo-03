@@ -11,6 +11,12 @@ import (
 	"github.com/gobuffalo/validate/v3"
 )
 
+// taskForm recoge los campos editables del formulario de tareas.
+type taskForm struct {
+	Title   string `form:"title" json:"title"`
+	DueDate string `form:"due_date" json:"due_date"`
+}
+
 // TasksIndex muestra la lista de tareas y el formulario de creación.
 func TasksIndex(c buffalo.Context) error {
 	tx := c.Value("tx").(*pop.Connection)
@@ -30,15 +36,22 @@ func TasksIndex(c buffalo.Context) error {
 func TasksCreate(c buffalo.Context) error {
 	tx := c.Value("tx").(*pop.Connection)
 
-	task := &models.Task{}
-	if err := c.Bind(task); err != nil {
+	input := taskForm{}
+	if err := c.Bind(&input); err != nil {
 		return err
 	}
-	task.Title = strings.TrimSpace(task.Title)
+	task := &models.Task{Title: strings.TrimSpace(input.Title)}
+	dueDate, dueDateErr := models.ParseDueDate(input.DueDate)
+	if dueDateErr == nil {
+		task.DueDate = dueDate
+	}
 
-	verrs, err := tx.ValidateAndCreate(task)
+	verrs, err := task.Validate(tx)
 	if err != nil {
 		return err
+	}
+	if dueDateErr != nil {
+		verrs.Add("due_date", models.DueDateInvalidMessage)
 	}
 
 	if verrs.HasAny() {
@@ -51,6 +64,10 @@ func TasksCreate(c buffalo.Context) error {
 		c.Set("task", task)
 		c.Set("errors", verrs)
 		return c.Render(http.StatusUnprocessableEntity, r.HTML("tasks/index.plush.html"))
+	}
+
+	if err := tx.Create(task); err != nil {
+		return err
 	}
 
 	c.Flash().Add("success", "Tarea creada.")
@@ -71,7 +88,7 @@ func TasksEdit(c buffalo.Context) error {
 	return c.Render(http.StatusOK, r.HTML("tasks/edit.plush.html"))
 }
 
-// TasksUpdate actualiza solo el título, conservando los demás datos de la tarea.
+// TasksUpdate actualiza el título y la fecha límite, conservando los demás datos de la tarea.
 func TasksUpdate(c buffalo.Context) error {
 	tx := c.Value("tx").(*pop.Connection)
 
@@ -80,22 +97,31 @@ func TasksUpdate(c buffalo.Context) error {
 		return c.Error(http.StatusNotFound, err)
 	}
 
-	input := struct {
-		Title string `form:"title" json:"title"`
-	}{}
+	input := taskForm{}
 	if err := c.Bind(&input); err != nil {
 		return err
 	}
 	task.Title = strings.TrimSpace(input.Title)
+	dueDate, dueDateErr := models.ParseDueDate(input.DueDate)
+	if dueDateErr == nil {
+		task.DueDate = dueDate
+	}
 
-	verrs, err := tx.ValidateAndUpdate(task)
+	verrs, err := task.Validate(tx)
 	if err != nil {
 		return err
+	}
+	if dueDateErr != nil {
+		verrs.Add("due_date", models.DueDateInvalidMessage)
 	}
 	if verrs.HasAny() {
 		c.Set("task", task)
 		c.Set("errors", verrs)
 		return c.Render(http.StatusUnprocessableEntity, r.HTML("tasks/edit.plush.html"))
+	}
+
+	if err := tx.Update(task); err != nil {
+		return err
 	}
 
 	c.Flash().Add("success", "Tarea actualizada.")
