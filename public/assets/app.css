@@ -137,6 +137,15 @@ h1 {
   line-height: 1.55;
 }
 
+.task-due {
+  grid-column: 2;
+  grid-row: 2;
+  margin-top: -0.55rem;
+  padding-bottom: 0.3rem;
+  color: var(--color-muted);
+  font-size: 0.8rem;
+}
+
 .task-toggle-button,
 .icon-action {
   position: relative;
@@ -245,7 +254,8 @@ h1 {
   line-height: 1;
 }
 
-input[type="text"] {
+input[type="text"],
+input[type="date"] {
   width: 100%;
   min-width: 0;
   min-height: 44px;
@@ -259,6 +269,11 @@ input[type="text"] {
 
 .new-task-row input {
   flex: 1;
+}
+
+.new-task-row input[type="date"] {
+  flex: 0 0 auto;
+  width: auto;
 }
 
 input::placeholder {
@@ -367,6 +382,14 @@ input:focus-visible {
   margin-bottom: 0.5rem;
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+.edit-task label:not(:first-of-type) {
+  margin-top: 1.25rem;
+}
+
+.edit-task input[type="date"] {
+  width: auto;
 }
 
 .edit-task-actions {
