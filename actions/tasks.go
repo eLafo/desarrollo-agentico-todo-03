@@ -35,6 +35,7 @@ func TasksCreate(c buffalo.Context) error {
 		return err
 	}
 	task.Title = strings.TrimSpace(task.Title)
+	task.SetDueDate(c.Param("due_date"))
 
 	verrs, err := tx.ValidateAndCreate(task)
 	if err != nil {
@@ -71,7 +72,7 @@ func TasksEdit(c buffalo.Context) error {
 	return c.Render(http.StatusOK, r.HTML("tasks/edit.plush.html"))
 }
 
-// TasksUpdate actualiza solo el título, conservando los demás datos de la tarea.
+// TasksUpdate actualiza el título y la fecha límite, conservando los demás datos de la tarea.
 func TasksUpdate(c buffalo.Context) error {
 	tx := c.Value("tx").(*pop.Connection)
 
@@ -87,6 +88,7 @@ func TasksUpdate(c buffalo.Context) error {
 		return err
 	}
 	task.Title = strings.TrimSpace(input.Title)
+	task.SetDueDate(c.Param("due_date"))
 
 	verrs, err := tx.ValidateAndUpdate(task)
 	if err != nil {
