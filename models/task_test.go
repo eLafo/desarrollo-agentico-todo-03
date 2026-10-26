@@ -1,6 +1,9 @@
 package models
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 func (ms *ModelSuite) Test_Task_Create_Valid() {
 	task := &Task{Title: "Comprar café"}
@@ -68,4 +71,53 @@ func (ms *ModelSuite) Test_Task_Toggle_Persists() {
 	reloaded := &Task{}
 	ms.NoError(ms.DB.Find(reloaded, task.ID))
 	ms.True(reloaded.Completed)
+}
+
+func (ms *ModelSuite) Test_ParseDueDate() {
+	for _, value := range []string{"", "   "} {
+		dueDate, ok := ParseDueDate(value)
+		ms.True(ok, value)
+		ms.Nil(dueDate, value)
+	}
+
+	dueDate, ok := ParseDueDate("2026-11-15")
+	ms.True(ok)
+	ms.NotNil(dueDate)
+	ms.Equal(2026, dueDate.Year())
+	ms.Equal(time.November, dueDate.Month())
+	ms.Equal(15, dueDate.Day())
+
+	for _, value := range []string{"2026-02-30", "15/11/2026", "2026-11-15T10:00", "mañana"} {
+		dueDate, ok := ParseDueDate(value)
+		ms.False(ok, value)
+		ms.Nil(dueDate, value)
+	}
+}
+
+func (ms *ModelSuite) Test_Task_DueDate_Optional() {
+	task := &Task{Title: "Sin fecha límite"}
+	verrs, err := ms.DB.ValidateAndCreate(task)
+	ms.NoError(err)
+	ms.False(verrs.HasAny())
+
+	reloaded := &Task{}
+	ms.NoError(ms.DB.Find(reloaded, task.ID))
+	ms.Nil(reloaded.DueDate)
+	ms.Equal("", reloaded.DueDateValue())
+	ms.Equal("", reloaded.DueDateLabel())
+}
+
+func (ms *ModelSuite) Test_Task_DueDate_Persists() {
+	dueDate, ok := ParseDueDate("2026-11-15")
+	ms.True(ok)
+
+	task := &Task{Title: "Con fecha límite", DueDate: dueDate}
+	verrs, err := ms.DB.ValidateAndCreate(task)
+	ms.NoError(err)
+	ms.False(verrs.HasAny())
+
+	reloaded := &Task{}
+	ms.NoError(ms.DB.Find(reloaded, task.ID))
+	ms.Equal("2026-11-15", reloaded.DueDateValue())
+	ms.Equal("15/11/2026", reloaded.DueDateLabel())
 }
