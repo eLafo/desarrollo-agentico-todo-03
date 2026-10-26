@@ -29,7 +29,12 @@
               <span class="toggle-label sr-only"><%= if (t.Completed) { %>Reabrir<% } else { %>Completar<% } %></span>
             </button>
           </form>
-          <span class="task-title"><%= t.Title %></span>
+          <div class="task-content">
+            <span class="task-title"><%= t.Title %></span>
+            <%= if (t.DueDate.Valid) { %>
+              <span class="task-due">Fecha límite: <time datetime="<%= t.DueDateISO() %>"><%= t.DueDateDisplay() %></time></span>
+            <% } %>
+          </div>
           <%= if (t.Completed) { %>
             <span class="task-status">Completada</span>
           <% } %>
@@ -69,6 +74,14 @@
       maxlength="200"
       autocomplete="off"
       <%= if (errors.HasAny()) { %>autofocus aria-invalid="true" aria-describedby="title-error"<% } %>
+    >
+    <label for="task-due-date" class="sr-only">Fecha límite (opcional)</label>
+    <input
+      id="task-due-date"
+      type="date"
+      name="due_date"
+      value="<%= task.DueDateISO() %>"
+      title="Fecha límite (opcional)"
     >
     <button type="submit" class="button button-primary">Añadir</button>
   </div>
