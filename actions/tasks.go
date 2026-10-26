@@ -36,10 +36,11 @@ func TasksCreate(c buffalo.Context) error {
 	}
 	task.Title = strings.TrimSpace(task.Title)
 
-	verrs, err := tx.ValidateAndCreate(task)
+	verrs, err := task.Validate(tx)
 	if err != nil {
 		return err
 	}
+	assignDueDate(task, c.Param("due_date"), verrs)
 
 	if verrs.HasAny() {
 		tasks := models.Tasks{}
@@ -51,6 +52,10 @@ func TasksCreate(c buffalo.Context) error {
 		c.Set("task", task)
 		c.Set("errors", verrs)
 		return c.Render(http.StatusUnprocessableEntity, r.HTML("tasks/index.plush.html"))
+	}
+
+	if err := tx.Create(task); err != nil {
+		return err
 	}
 
 	c.Flash().Add("success", "Tarea creada.")
@@ -71,7 +76,7 @@ func TasksEdit(c buffalo.Context) error {
 	return c.Render(http.StatusOK, r.HTML("tasks/edit.plush.html"))
 }
 
-// TasksUpdate actualiza solo el título, conservando los demás datos de la tarea.
+// TasksUpdate actualiza el título y la fecha límite, conservando los demás datos de la tarea.
 func TasksUpdate(c buffalo.Context) error {
 	tx := c.Value("tx").(*pop.Connection)
 
@@ -81,21 +86,27 @@ func TasksUpdate(c buffalo.Context) error {
 	}
 
 	input := struct {
-		Title string `form:"title" json:"title"`
+		Title   string `form:"title" json:"title"`
+		DueDate string `form:"due_date" json:"due_date"`
 	}{}
 	if err := c.Bind(&input); err != nil {
 		return err
 	}
 	task.Title = strings.TrimSpace(input.Title)
 
-	verrs, err := tx.ValidateAndUpdate(task)
+	verrs, err := task.Validate(tx)
 	if err != nil {
 		return err
 	}
+	assignDueDate(task, input.DueDate, verrs)
 	if verrs.HasAny() {
 		c.Set("task", task)
 		c.Set("errors", verrs)
 		return c.Render(http.StatusUnprocessableEntity, r.HTML("tasks/edit.plush.html"))
+	}
+
+	if err := tx.Update(task); err != nil {
+		return err
 	}
 
 	c.Flash().Add("success", "Tarea actualizada.")
@@ -134,4 +145,14 @@ func TasksDestroy(c buffalo.Context) error {
 
 	c.Flash().Add("success", "Tarea eliminada.")
 	return c.Redirect(http.StatusSeeOther, "/")
+}
+
+// assignDueDate asigna a la tarea la fecha límite del formulario o anota un error si no es un día válido.
+func assignDueDate(task *models.Task, value string, verrs *validate.Errors) {
+	dueDate, err := models.ParseDueDate(value)
+	if err != nil {
+		verrs.Add("due_date", err.Error())
+		return
+	}
+	task.DueDate = dueDate
 }

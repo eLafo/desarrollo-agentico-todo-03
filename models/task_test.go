@@ -1,6 +1,9 @@
 package models
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 func (ms *ModelSuite) Test_Task_Create_Valid() {
 	task := &Task{Title: "Comprar café"}
@@ -68,4 +71,66 @@ func (ms *ModelSuite) Test_Task_Toggle_Persists() {
 	reloaded := &Task{}
 	ms.NoError(ms.DB.Find(reloaded, task.ID))
 	ms.True(reloaded.Completed)
+}
+
+func (ms *ModelSuite) Test_Task_DueDate_Persists() {
+	dueDate := time.Date(2026, time.November, 15, 0, 0, 0, 0, time.UTC)
+	task := &Task{Title: "Pagar el seguro", DueDate: &dueDate}
+	verrs, err := ms.DB.ValidateAndCreate(task)
+	ms.NoError(err)
+	ms.False(verrs.HasAny())
+
+	reloaded := &Task{}
+	ms.NoError(ms.DB.Find(reloaded, task.ID))
+	ms.True(reloaded.HasDueDate())
+	ms.Equal("2026-11-15", reloaded.DueDateValue())
+}
+
+func (ms *ModelSuite) Test_Task_DueDate_Optional() {
+	task := &Task{Title: "Sin fecha límite"}
+	verrs, err := ms.DB.ValidateAndCreate(task)
+	ms.NoError(err)
+	ms.False(verrs.HasAny())
+
+	reloaded := &Task{}
+	ms.NoError(ms.DB.Find(reloaded, task.ID))
+	ms.Nil(reloaded.DueDate)
+	ms.False(reloaded.HasDueDate())
+	ms.Empty(reloaded.DueDateValue())
+	ms.Empty(reloaded.DueDateLabel())
+}
+
+func (ms *ModelSuite) Test_Task_DueDate_Clear() {
+	dueDate := time.Date(2026, time.November, 15, 0, 0, 0, 0, time.UTC)
+	task := &Task{Title: "Fecha que se quita", DueDate: &dueDate}
+	verrs, err := ms.DB.ValidateAndCreate(task)
+	ms.NoError(err)
+	ms.False(verrs.HasAny())
+
+	task.DueDate = nil
+	ms.NoError(ms.DB.Update(task))
+
+	reloaded := &Task{}
+	ms.NoError(ms.DB.Find(reloaded, task.ID))
+	ms.Nil(reloaded.DueDate)
+}
+
+func (ms *ModelSuite) Test_ParseDueDate() {
+	for _, value := range []string{"", "   "} {
+		dueDate, err := ParseDueDate(value)
+		ms.NoError(err)
+		ms.Nil(dueDate)
+	}
+
+	dueDate, err := ParseDueDate("2026-11-15")
+	ms.NoError(err)
+	task := Task{DueDate: dueDate}
+	ms.Equal("2026-11-15", task.DueDateValue())
+	ms.Equal("15/11/2026", task.DueDateLabel())
+
+	for _, value := range []string{"2026-02-30", "15/11/2026", "2026-11-15T10:00", "mañana"} {
+		dueDate, err := ParseDueDate(value)
+		ms.ErrorIs(err, ErrInvalidDueDate, value)
+		ms.Nil(dueDate, value)
+	}
 }
