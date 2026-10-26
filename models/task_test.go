@@ -69,3 +69,50 @@ func (ms *ModelSuite) Test_Task_Toggle_Persists() {
 	ms.NoError(ms.DB.Find(reloaded, task.ID))
 	ms.True(reloaded.Completed)
 }
+
+func (ms *ModelSuite) Test_Task_DueDate_Optional() {
+	task := &Task{Title: "Sin fecha límite"}
+	verrs, err := ms.DB.ValidateAndCreate(task)
+	ms.NoError(err)
+	ms.False(verrs.HasAny())
+
+	reloaded := &Task{}
+	ms.NoError(ms.DB.Find(reloaded, task.ID))
+	ms.False(reloaded.DueDate.Valid)
+	ms.Equal("", reloaded.DueDateValue())
+	ms.Equal("", reloaded.DueDateLabel())
+}
+
+func (ms *ModelSuite) Test_Task_DueDate_PersistsDay() {
+	dueDate, err := ParseDueDate("2026-11-15")
+	ms.NoError(err)
+
+	task := &Task{Title: "Con fecha límite", DueDate: dueDate}
+	verrs, err := ms.DB.ValidateAndCreate(task)
+	ms.NoError(err)
+	ms.False(verrs.HasAny())
+
+	reloaded := &Task{}
+	ms.NoError(ms.DB.Find(reloaded, task.ID))
+	ms.True(reloaded.DueDate.Valid)
+	ms.Equal("2026-11-15", reloaded.DueDateValue())
+	ms.Equal("15/11/2026", reloaded.DueDateLabel())
+}
+
+func (ms *ModelSuite) Test_ParseDueDate() {
+	for _, value := range []string{"", "   "} {
+		dueDate, err := ParseDueDate(value)
+		ms.NoError(err)
+		ms.False(dueDate.Valid)
+	}
+
+	dueDate, err := ParseDueDate(" 2026-11-15 ")
+	ms.NoError(err)
+	ms.True(dueDate.Valid)
+	ms.Equal("2026-11-15", dueDate.Time.Format(DueDateLayout))
+
+	for _, value := range []string{"2026-02-30", "15/11/2026", "2026-11-15T10:00", "mañana"} {
+		_, err := ParseDueDate(value)
+		ms.Error(err, value)
+	}
+}
