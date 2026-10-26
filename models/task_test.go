@@ -69,3 +69,70 @@ func (ms *ModelSuite) Test_Task_Toggle_Persists() {
 	ms.NoError(ms.DB.Find(reloaded, task.ID))
 	ms.True(reloaded.Completed)
 }
+
+func (ms *ModelSuite) Test_Task_DueDate_OptionalByDefault() {
+	task := &Task{Title: "Sin fecha límite"}
+	verrs, err := ms.DB.ValidateAndCreate(task)
+	ms.NoError(err)
+	ms.False(verrs.HasAny())
+
+	reloaded := &Task{}
+	ms.NoError(ms.DB.Find(reloaded, task.ID))
+	ms.False(reloaded.DueDate.Valid)
+	ms.Equal("", reloaded.DueDateValue())
+	ms.Equal("", reloaded.DueDateLabel())
+}
+
+func (ms *ModelSuite) Test_Task_DueDate_Persists() {
+	task := &Task{Title: "Entregar el informe"}
+	task.SetDueDate("2026-11-15")
+	verrs, err := ms.DB.ValidateAndCreate(task)
+	ms.NoError(err)
+	ms.False(verrs.HasAny())
+
+	reloaded := &Task{}
+	ms.NoError(ms.DB.Find(reloaded, task.ID))
+	ms.True(reloaded.DueDate.Valid)
+	ms.Equal("2026-11-15", reloaded.DueDateValue())
+	ms.Equal("15/11/2026", reloaded.DueDateLabel())
+}
+
+func (ms *ModelSuite) Test_Task_DueDate_EmptyClears() {
+	task := &Task{Title: "Con fecha límite"}
+	task.SetDueDate("2026-11-15")
+	ms.True(task.DueDate.Valid)
+
+	task.SetDueDate("   ")
+	ms.False(task.DueDate.Valid)
+
+	verrs, err := ms.DB.ValidateAndCreate(task)
+	ms.NoError(err)
+	ms.False(verrs.HasAny())
+}
+
+func (ms *ModelSuite) Test_Task_DueDate_Invalid() {
+	for _, value := range []string{"2026-02-30", "15/11/2026", "2026-11-15T10:00", "mañana", "0000-01-01"} {
+		task := &Task{Title: "Fecha no válida"}
+		task.SetDueDate(value)
+
+		verrs, err := ms.DB.ValidateAndCreate(task)
+		ms.NoError(err)
+		ms.True(verrs.HasAny(), value)
+		ms.Contains(verrs.Get("due_date"), "La fecha límite no es un día válido.", value)
+
+		count, err := ms.DB.Count(&Task{})
+		ms.NoError(err)
+		ms.Equal(0, count, value)
+	}
+}
+
+func (ms *ModelSuite) Test_Task_DueDate_ValidAfterInvalid() {
+	task := &Task{Title: "Corregir la fecha"}
+	task.SetDueDate("2026-02-30")
+	task.SetDueDate("2026-11-15")
+
+	verrs, err := ms.DB.ValidateAndCreate(task)
+	ms.NoError(err)
+	ms.False(verrs.HasAny())
+	ms.Equal("2026-11-15", task.DueDateValue())
+}
