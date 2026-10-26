@@ -1,0 +1,1 @@
+add_column("tasks", "due_date", "date", {"null": true})
