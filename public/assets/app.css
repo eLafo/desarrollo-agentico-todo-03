@@ -130,11 +130,22 @@ h1 {
 }
 
 .task-title {
+  display: block;
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+}
+
+.task-content {
   align-self: center;
   min-width: 0;
   padding: 0.65rem 0;
-  overflow-wrap: anywhere;
-  line-height: 1.55;
+}
+
+.task-due {
+  display: block;
+  margin-top: 0.1rem;
+  color: var(--color-muted);
+  font-size: 0.8rem;
 }
 
 .task-toggle-button,
@@ -245,7 +256,8 @@ h1 {
   line-height: 1;
 }
 
-input[type="text"] {
+input[type="text"],
+input[type="date"] {
   width: 100%;
   min-width: 0;
   min-height: 44px;
@@ -259,6 +271,11 @@ input[type="text"] {
 
 .new-task-row input {
   flex: 1;
+}
+
+.new-task-row input[type="date"] {
+  flex: 0 0 auto;
+  width: auto;
 }
 
 input::placeholder {
@@ -367,6 +384,10 @@ input:focus-visible {
   margin-bottom: 0.5rem;
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+.edit-task p + label {
+  margin-top: 1.25rem;
 }
 
 .edit-task-actions {
