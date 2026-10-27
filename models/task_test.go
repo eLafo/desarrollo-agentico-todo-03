@@ -69,3 +69,57 @@ func (ms *ModelSuite) Test_Task_Toggle_Persists() {
 	ms.NoError(ms.DB.Find(reloaded, task.ID))
 	ms.True(reloaded.Completed)
 }
+
+func (ms *ModelSuite) Test_Task_DueDate_Optional() {
+	task := &Task{Title: "Sin fecha"}
+
+	verrs, err := ms.DB.ValidateAndCreate(task)
+	ms.NoError(err)
+	ms.False(verrs.HasAny())
+
+	reloaded := &Task{}
+	ms.NoError(ms.DB.Find(reloaded, task.ID))
+	ms.Nil(reloaded.DueDate)
+}
+
+func (ms *ModelSuite) Test_Task_DueDate_PersistsDay() {
+	task := &Task{Title: "Con fecha"}
+	task.SetDueDate("2026-11-05")
+
+	verrs, err := ms.DB.ValidateAndCreate(task)
+	ms.NoError(err)
+	ms.False(verrs.HasAny())
+
+	reloaded := &Task{}
+	ms.NoError(ms.DB.Find(reloaded, task.ID))
+	ms.Equal("2026-11-05", reloaded.DueDateValue())
+	ms.Equal("05/11/2026", reloaded.DueDateLabel())
+}
+
+func (ms *ModelSuite) Test_Task_DueDate_Invalid() {
+	for _, value := range []string{"2026-02-30", "05/11/2026", "2026-11-05T10:00", "mañana"} {
+		task := &Task{Title: "Fecha incorrecta"}
+		task.SetDueDate(value)
+
+		verrs, err := ms.DB.ValidateAndCreate(task)
+		ms.NoError(err)
+		ms.True(verrs.HasAny(), value)
+		ms.Contains(verrs.Get("due_date"), "La fecha límite no es válida.", value)
+		ms.Nil(task.DueDate, value)
+	}
+
+	count, err := ms.DB.Count(&Task{})
+	ms.NoError(err)
+	ms.Equal(0, count)
+}
+
+func (ms *ModelSuite) Test_Task_SetDueDate_BlankClears() {
+	task := &Task{Title: "Fecha quitada"}
+	task.SetDueDate("2026-11-05")
+	task.SetDueDate("   ")
+	ms.Nil(task.DueDate)
+
+	verrs, err := ms.DB.ValidateAndCreate(task)
+	ms.NoError(err)
+	ms.False(verrs.HasAny())
+}
