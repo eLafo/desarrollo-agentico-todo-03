@@ -36,9 +36,13 @@ func TasksCreate(c buffalo.Context) error {
 	}
 	task.Title = strings.TrimSpace(task.Title)
 
-	verrs, err := tx.ValidateAndCreate(task)
-	if err != nil {
-		return err
+	verrs := task.SetDueDate(c.Param("due_date"))
+	if !verrs.HasAny() {
+		var err error
+		verrs, err = tx.ValidateAndCreate(task)
+		if err != nil {
+			return err
+		}
 	}
 
 	if verrs.HasAny() {
@@ -71,7 +75,7 @@ func TasksEdit(c buffalo.Context) error {
 	return c.Render(http.StatusOK, r.HTML("tasks/edit.plush.html"))
 }
 
-// TasksUpdate actualiza solo el título, conservando los demás datos de la tarea.
+// TasksUpdate actualiza el título y la fecha límite, conservando los demás datos de la tarea.
 func TasksUpdate(c buffalo.Context) error {
 	tx := c.Value("tx").(*pop.Connection)
 
@@ -81,16 +85,21 @@ func TasksUpdate(c buffalo.Context) error {
 	}
 
 	input := struct {
-		Title string `form:"title" json:"title"`
+		Title   string `form:"title" json:"title"`
+		DueDate string `form:"due_date" json:"due_date"`
 	}{}
 	if err := c.Bind(&input); err != nil {
 		return err
 	}
 	task.Title = strings.TrimSpace(input.Title)
 
-	verrs, err := tx.ValidateAndUpdate(task)
-	if err != nil {
-		return err
+	verrs := task.SetDueDate(input.DueDate)
+	if !verrs.HasAny() {
+		var err error
+		verrs, err = tx.ValidateAndUpdate(task)
+		if err != nil {
+			return err
+		}
 	}
 	if verrs.HasAny() {
 		c.Set("task", task)

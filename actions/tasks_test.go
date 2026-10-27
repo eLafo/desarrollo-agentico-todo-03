@@ -237,3 +237,107 @@ func (as *ActionSuite) Test_TasksUpdate_InvalidID() {
 	res := as.HTML("/tasks/no-es-un-uuid").Put(url.Values{"title": {"Título nuevo"}})
 	as.Equal(404, res.Code)
 }
+
+func (as *ActionSuite) taskWithDueDate(title, day string) *models.Task {
+	task := &models.Task{Title: title}
+	as.False(task.SetDueDate(day).HasAny())
+	verrs, err := as.DB.ValidateAndCreate(task)
+	as.NoError(err)
+	as.False(verrs.HasAny())
+	return task
+}
+
+func (as *ActionSuite) Test_TasksCreate_WithDueDate() {
+	res := as.HTML("/tasks").Post(url.Values{"title": {"Pagar el alquiler"}, "due_date": {"2026-11-15"}})
+	as.Equal(303, res.Code)
+
+	task := &models.Task{}
+	as.NoError(as.DB.First(task))
+	as.Equal("Pagar el alquiler", task.Title)
+	as.Equal("2026-11-15", task.DueDateValue())
+}
+
+func (as *ActionSuite) Test_TasksCreate_EmptyDueDate() {
+	res := as.HTML("/tasks").Post(url.Values{"title": {"Pagar el alquiler"}, "due_date": {""}})
+	as.Equal(303, res.Code)
+
+	task := &models.Task{}
+	as.NoError(as.DB.First(task))
+	as.Nil(task.DueDate)
+}
+
+func (as *ActionSuite) Test_TasksCreate_InvalidDueDate() {
+	res := as.HTML("/tasks").Post(url.Values{"title": {"Pagar el alquiler"}, "due_date": {"2026-02-30"}})
+	as.Equal(422, res.Code)
+	as.Contains(res.Body.String(), "La fecha límite no es válida. Usa el formato aaaa-mm-dd.")
+	as.Contains(res.Body.String(), `aria-describedby="due-date-error"`)
+
+	count, err := as.DB.Count(&models.Task{})
+	as.NoError(err)
+	as.Equal(0, count)
+}
+
+func (as *ActionSuite) Test_TasksCreate_EmptyTitle_KeepsDueDate() {
+	res := as.HTML("/tasks").Post(url.Values{"title": {""}, "due_date": {"2026-11-15"}})
+	as.Equal(422, res.Code)
+	as.Contains(res.Body.String(), "El título es obligatorio.")
+	as.Contains(res.Body.String(), `value="2026-11-15"`)
+}
+
+func (as *ActionSuite) Test_TasksIndex_ShowsDueDate() {
+	as.taskWithDueDate("Pagar el alquiler", "2026-11-15")
+	as.taskWithDueDate("Sin fecha límite", "")
+
+	res := as.HTML("/").Get()
+	as.Equal(200, res.Code)
+
+	body := res.Body.String()
+	as.Contains(body, `<time datetime="2026-11-15">15/11/2026</time>`)
+	as.Equal(1, strings.Count(body, "Fecha límite:"))
+}
+
+func (as *ActionSuite) Test_TasksEdit_PrefillsDueDate() {
+	task := as.taskWithDueDate("Pagar el alquiler", "2026-11-15")
+
+	res := as.HTML("/tasks/%s/edit", task.ID).Get()
+	as.Equal(200, res.Code)
+	as.Contains(res.Body.String(), `name="due_date"`)
+	as.Contains(res.Body.String(), `value="2026-11-15"`)
+}
+
+func (as *ActionSuite) Test_TasksUpdate_ChangesDueDate() {
+	task := &models.Task{Title: "Pagar el alquiler", Completed: true}
+	as.False(task.SetDueDate("2026-11-15").HasAny())
+	verrs, err := as.DB.ValidateAndCreate(task)
+	as.NoError(err)
+	as.False(verrs.HasAny())
+
+	res := as.HTML("/tasks/%s", task.ID).Put(url.Values{"title": {"Pagar el alquiler"}, "due_date": {"2026-12-01"}})
+	as.Equal(303, res.Code)
+
+	as.NoError(as.DB.Reload(task))
+	as.Equal("2026-12-01", task.DueDateValue())
+	as.True(task.Completed)
+}
+
+func (as *ActionSuite) Test_TasksUpdate_ClearsDueDate() {
+	task := as.taskWithDueDate("Pagar el alquiler", "2026-11-15")
+
+	res := as.HTML("/tasks/%s", task.ID).Put(url.Values{"title": {"Pagar el alquiler"}, "due_date": {""}})
+	as.Equal(303, res.Code)
+
+	as.NoError(as.DB.Reload(task))
+	as.Nil(task.DueDate)
+}
+
+func (as *ActionSuite) Test_TasksUpdate_InvalidDueDate() {
+	task := as.taskWithDueDate("Pagar el alquiler", "2026-11-15")
+
+	res := as.HTML("/tasks/%s", task.ID).Put(url.Values{"title": {"Otro"}, "due_date": {"15/11/2026"}})
+	as.Equal(422, res.Code)
+	as.Contains(res.Body.String(), "La fecha límite no es válida. Usa el formato aaaa-mm-dd.")
+
+	as.NoError(as.DB.Reload(task))
+	as.Equal("Pagar el alquiler", task.Title)
+	as.Equal("2026-11-15", task.DueDateValue())
+}
