@@ -69,3 +69,57 @@ func (ms *ModelSuite) Test_Task_Toggle_Persists() {
 	ms.NoError(ms.DB.Find(reloaded, task.ID))
 	ms.True(reloaded.Completed)
 }
+
+func (ms *ModelSuite) Test_Task_DueDate_OptionalByDefault() {
+	task := &Task{Title: "Sin fecha"}
+	verrs, err := ms.DB.ValidateAndCreate(task)
+	ms.NoError(err)
+	ms.False(verrs.HasAny())
+
+	reloaded := &Task{}
+	ms.NoError(ms.DB.Find(reloaded, task.ID))
+	ms.Nil(reloaded.DueDate)
+	ms.False(reloaded.HasDueDate())
+	ms.Equal("", reloaded.DueDateValue())
+}
+
+func (ms *ModelSuite) Test_Task_DueDate_Persists() {
+	task := &Task{Title: "Entregar el informe"}
+	task.SetDueDate(" 2026-11-15 ")
+	verrs, err := ms.DB.ValidateAndCreate(task)
+	ms.NoError(err)
+	ms.False(verrs.HasAny())
+
+	reloaded := &Task{}
+	ms.NoError(ms.DB.Find(reloaded, task.ID))
+	ms.True(reloaded.HasDueDate())
+	ms.Equal("2026-11-15", reloaded.DueDateValue())
+	ms.Equal("15/11/2026", reloaded.DueDateLabel())
+}
+
+func (ms *ModelSuite) Test_Task_DueDate_Invalid() {
+	for _, value := range []string{"2026-02-30", "15/11/2026", "2026-11-15T10:00", "mañana"} {
+		task := &Task{Title: "Entregar el informe"}
+		task.SetDueDate(value)
+
+		verrs, err := ms.DB.ValidateAndCreate(task)
+		ms.NoError(err)
+		ms.Contains(verrs.Get("due_date"), "La fecha límite no es válida.", value)
+		ms.Nil(task.DueDate, value)
+	}
+
+	count, err := ms.DB.Count(&Task{})
+	ms.NoError(err)
+	ms.Equal(0, count)
+}
+
+func (ms *ModelSuite) Test_Task_DueDate_EmptyClears() {
+	task := &Task{Title: "Entregar el informe"}
+	task.SetDueDate("2026-11-15")
+	task.SetDueDate("   ")
+	ms.Nil(task.DueDate)
+
+	verrs, err := task.Validate(ms.DB)
+	ms.NoError(err)
+	ms.Empty(verrs.Get("due_date"))
+}
