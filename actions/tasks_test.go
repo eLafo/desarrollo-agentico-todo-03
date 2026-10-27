@@ -26,6 +26,7 @@ func (as *ActionSuite) Test_TasksIndex_ListsTasks() {
 	as.Contains(body, "Llamar al gestor")
 	as.Contains(body, "Publicar la oferta de empleo")
 	as.Contains(body, "Completada")
+	as.NotContains(body, `class="task-due"`)
 }
 
 func (as *ActionSuite) Test_TasksCreate_Valid() {
@@ -236,4 +237,109 @@ func (as *ActionSuite) Test_TasksUpdate_NotFound() {
 func (as *ActionSuite) Test_TasksUpdate_InvalidID() {
 	res := as.HTML("/tasks/no-es-un-uuid").Put(url.Values{"title": {"Título nuevo"}})
 	as.Equal(404, res.Code)
+}
+
+func (as *ActionSuite) taskWithDueDate(day string, completed bool) *models.Task {
+	dueDate, err := models.ParseDueDate(day)
+	as.NoError(err)
+	task := &models.Task{Title: "Título original", Completed: completed, DueDate: dueDate}
+	verrs, err := as.DB.ValidateAndCreate(task)
+	as.NoError(err)
+	as.False(verrs.HasAny())
+	as.NoError(as.DB.Reload(task))
+	return task
+}
+
+func (as *ActionSuite) Test_TasksCreate_WithDueDate() {
+	res := as.HTML("/tasks").Post(url.Values{"title": {"Con fecha"}, "due_date": {"2026-11-05"}})
+	as.Equal(303, res.Code)
+
+	task := &models.Task{}
+	as.NoError(as.DB.First(task))
+	as.Equal("Con fecha", task.Title)
+	as.Equal("2026-11-05", task.DueDateValue())
+}
+
+func (as *ActionSuite) Test_TasksCreate_EmptyDueDate() {
+	res := as.HTML("/tasks").Post(url.Values{"title": {"Sin fecha"}, "due_date": {""}})
+	as.Equal(303, res.Code)
+
+	task := &models.Task{}
+	as.NoError(as.DB.First(task))
+	as.Nil(task.DueDate)
+}
+
+func (as *ActionSuite) Test_TasksCreate_InvalidDueDate() {
+	res := as.HTML("/tasks").Post(url.Values{"title": {"Fecha mal formada"}, "due_date": {"05/11/2026"}})
+	as.Equal(422, res.Code)
+
+	count, err := as.DB.Count(&models.Task{})
+	as.NoError(err)
+	as.Equal(0, count)
+}
+
+func (as *ActionSuite) Test_TasksCreate_InvalidTitle_KeepsDueDate() {
+	res := as.HTML("/tasks").Post(url.Values{"title": {""}, "due_date": {"2026-11-05"}})
+	as.Equal(422, res.Code)
+	as.Contains(res.Body.String(), "El título es obligatorio.")
+	as.Contains(res.Body.String(), `value="2026-11-05"`)
+
+	count, err := as.DB.Count(&models.Task{})
+	as.NoError(err)
+	as.Equal(0, count)
+}
+
+func (as *ActionSuite) Test_TasksIndex_ShowsDueDate() {
+	as.taskWithDueDate("2026-11-05", false)
+	as.taskForEditing(false)
+
+	res := as.HTML("/").Get()
+	as.Equal(200, res.Code)
+	as.Contains(res.Body.String(), `datetime="2026-11-05"`)
+	as.Contains(res.Body.String(), "Fecha límite: 05/11/2026")
+	as.Equal(1, strings.Count(res.Body.String(), `class="task-due"`))
+}
+
+func (as *ActionSuite) Test_TasksEdit_PrefillsDueDate() {
+	task := as.taskWithDueDate("2026-11-05", false)
+	res := as.HTML("/tasks/%s/edit", task.ID).Get()
+	as.Equal(200, res.Code)
+	as.Contains(res.Body.String(), `name="due_date"`)
+	as.Contains(res.Body.String(), `value="2026-11-05"`)
+}
+
+func (as *ActionSuite) Test_TasksUpdate_ChangesDueDate() {
+	task := as.taskWithDueDate("2026-11-05", true)
+	res := as.HTML("/tasks/%s", task.ID).Put(url.Values{"title": {"Nuevo título"}, "due_date": {"2026-12-01"}})
+	as.Equal(303, res.Code)
+	as.NoError(as.DB.Reload(task))
+	as.Equal("Nuevo título", task.Title)
+	as.Equal("2026-12-01", task.DueDateValue())
+	as.True(task.Completed)
+}
+
+func (as *ActionSuite) Test_TasksUpdate_ClearsDueDate() {
+	task := as.taskWithDueDate("2026-11-05", false)
+	res := as.HTML("/tasks/%s", task.ID).Put(url.Values{"title": {"Título original"}, "due_date": {""}})
+	as.Equal(303, res.Code)
+	as.NoError(as.DB.Reload(task))
+	as.Nil(task.DueDate)
+}
+
+func (as *ActionSuite) Test_TasksUpdate_InvalidDueDate() {
+	task := as.taskWithDueDate("2026-11-05", false)
+	res := as.HTML("/tasks/%s", task.ID).Put(url.Values{"title": {"Otro"}, "due_date": {"2026-13-40"}})
+	as.Equal(422, res.Code)
+	as.NoError(as.DB.Reload(task))
+	as.Equal("Título original", task.Title)
+	as.Equal("2026-11-05", task.DueDateValue())
+}
+
+func (as *ActionSuite) Test_TasksToggle_KeepsDueDate() {
+	task := as.taskWithDueDate("2026-11-05", false)
+	res := as.HTML("/tasks/%s/toggle", task.ID).Put(url.Values{})
+	as.Equal(303, res.Code)
+	as.NoError(as.DB.Reload(task))
+	as.True(task.Completed)
+	as.Equal("2026-11-05", task.DueDateValue())
 }

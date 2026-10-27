@@ -23,6 +23,15 @@
       <%= for (msg) in errors.Get("title") { %><%= msg %><% } %>
     </p>
   <% } %>
+  <label for="task-due-date" class="edit-task-due-label">Fecha límite</label>
+  <input
+    id="task-due-date"
+    type="date"
+    name="due_date"
+    value="<%= task.DueDateValue() %>"
+    aria-describedby="due-date-help"
+  >
+  <p id="due-date-help" class="field-hint">Opcional. Solo el día, sin hora. Déjala vacía para quitarla.</p>
   <div class="edit-task-actions">
     <a href="/" class="button">Cancelar</a>
     <button type="submit" class="button button-primary">Guardar cambios</button>
