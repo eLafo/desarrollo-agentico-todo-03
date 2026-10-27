@@ -137,6 +137,14 @@ h1 {
   line-height: 1.55;
 }
 
+.task-due-date {
+  grid-column: 2;
+  margin-top: -0.5rem;
+  padding-bottom: 0.4rem;
+  color: var(--color-muted);
+  font-size: 0.8rem;
+}
+
 .task-toggle-button,
 .icon-action {
   position: relative;
@@ -199,6 +207,8 @@ h1 {
 }
 
 .task-actions {
+  grid-column: 3;
+  grid-row: 1;
   display: flex;
   align-items: center;
   gap: 0.1rem;
@@ -245,7 +255,31 @@ h1 {
   line-height: 1;
 }
 
-input[type="text"] {
+.new-task-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+  padding-left: calc(44px + 0.6rem);
+}
+
+.new-task-options label {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.new-task-options .button {
+  margin-left: auto;
+}
+
+.field-optional {
+  font-weight: 400;
+  color: var(--color-muted);
+}
+
+input[type="text"],
+input[type="date"] {
   width: 100%;
   min-width: 0;
   min-height: 44px;
@@ -255,6 +289,10 @@ input[type="text"] {
   background: #ffffff;
   border: 1px solid #92928a;
   border-radius: 6px;
+}
+
+input[type="date"] {
+  width: auto;
 }
 
 .new-task-row input {
@@ -369,6 +407,10 @@ input:focus-visible {
   font-weight: 600;
 }
 
+.edit-task label:not(:first-of-type) {
+  margin-top: 1.5rem;
+}
+
 .edit-task-actions {
   display: flex;
   flex-wrap: wrap;
@@ -453,6 +495,11 @@ input:focus-visible {
   .add-mark {
     width: 36px;
   }
+
+  .new-task-options {
+    gap: 0.4rem;
+    padding-left: calc(32px + 0.4rem);
+  }
 }
 
 @media (max-width: 380px) {
@@ -460,16 +507,8 @@ input:focus-visible {
     padding-inline: 0.8rem;
   }
 
-  .new-task-row {
-    flex-wrap: wrap;
-  }
-
-  .new-task-row input {
-    flex-basis: calc(100% - 44px);
-  }
-
-  .new-task-row .button {
-    margin-left: auto;
+  .new-task-options {
+    padding-left: 0;
   }
 }
 
